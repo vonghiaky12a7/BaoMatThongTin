@@ -429,7 +429,7 @@ body, html {
         padding: 6px 0 46px 8px;
     }
 }
-
+/* frame */
 #frame #sidepanel #contacts ul li.contact:hover {
     background: #32465a;
 }

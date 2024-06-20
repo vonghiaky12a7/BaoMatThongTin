@@ -37,7 +37,7 @@ e.getUsers = function () {
     }
     return users;
 }
-
+// 1
 e.getUserChannels = function (userId, byP2p = false) {
     var userChannels = {};
     if (userId) {
