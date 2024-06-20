@@ -1,4 +1,4 @@
-/* Cryptology used Forge.js lib to encrypt/decrypt by symmetric or asymmetric algorithms */
+/* Cryptology sử dụng lib Forge.js để mã hóa/giải mã bằng thuật toán đối xứng hoặc bất đối xứng  */
 "use strict";
 
 // Create the encryption object for asymmetric RSA algorithm.

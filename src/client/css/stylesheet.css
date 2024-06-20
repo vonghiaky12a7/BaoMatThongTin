@@ -419,7 +419,7 @@ body, html {
 
 #frame #sidepanel #contacts ul li.contact {
     position: relative;
-    padding: 10px 0;
+    padding: 8px 0;
     font-size: 0.9em;
     cursor: pointer;
 }
@@ -445,6 +445,7 @@ body, html {
 
 #frame #sidepanel #contacts ul li.contact .wrap {
     width: 88%;
+    height: 40px;
     margin: 0 auto;
     position: relative;
 }
