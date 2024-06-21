@@ -158,6 +158,17 @@ button.login100-form-btn:hover {
   border-radius: 50%;
 }
 
+.register100-form-title {
+  font-size: 30px;
+  color: #fff;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  padding-top: 27px;
+  padding-bottom: 34px;
+  display: block;
+}
+
 .login100-form-title {
   font-size: 30px;
   color: #fff;
