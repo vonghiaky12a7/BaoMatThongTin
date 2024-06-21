@@ -61,7 +61,7 @@ var globalChannel = "environment"; // thêm bất kỳ người dùng đã xác 
 var chat = {}; // socket.io
 var loginExpireTime = 3600 * 1000; // 3600s
 
-// Xuất một hàm, để chúng ta có thể truyền 
+// Xuất một hàm, để chúng ta có thể truyền
 // các instance app và io từ file app.js:
 module.exports = function (app, io) {
   // Khởi tạo một ứng dụng socket.io mới, tên là 'chat'
@@ -101,17 +101,6 @@ module.exports = function (app, io) {
         // người dùng mới
         // Sử dụng đối tượng socket để lưu trữ dữ liệu. Mỗi client nhận được
         // đối tượng socket duy nhất của họ
-
-        // var user = {
-        //   socketid: socket.id, // just solid for this connection and changed for another connecting times
-        //   id: data.email.hashCode(), // unique for this email
-        //   username: data.username, // display name, maybe not unique
-        //   email: data.email, // unique email address for any users
-        //   password: userHashedPass, // Store Password Hashing for client login to authenticate one user per email
-        //   avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), // user avatar picture's
-        //   status: "online", // { "online", "offline" }
-        //   lastLoginDate: Date.now(), // last login time accourding by server time
-        // };
 
         var newUser = {
           id: data.email.hashCode(),
