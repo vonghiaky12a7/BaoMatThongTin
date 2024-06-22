@@ -1,14 +1,14 @@
 /* Cryptology sử dụng lib Forge.js để mã hóa/giải mã bằng thuật toán đối xứng hoặc bất đối xứng  */
 "use strict";
 
-// Create the encryption object for asymmetric RSA algorithm.
+// Tạo đối tượng mã hóa cho thuật toán RSA bất đối xứng.
 var rsa = new JSEncrypt();
 
-// define the characters to pick from
+// định nghĩa các ký tự để chọn từ
 var chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz*&-%/!?*+=()";
 
-// create a key for symmetric encryption
-// pass in the desired length of your key
+// tạo một khóa cho mã hóa đối xứng
+// truyền vào độ dài khóa mong muốn
 function generateKey(keyLength) {
     var randomstring = '';
 
@@ -19,7 +19,7 @@ function generateKey(keyLength) {
     return randomstring;
 }
 
-// create the pair public and private key for asymmetric encryption
+// tạo cặp khóa công khai và khóa riêng cho mã hóa bất đối xứng
 var generateKeyPair = function () {
     var crypt = new JSEncrypt({ default_key_size: 1024 });
     crypt.getKey();
@@ -30,40 +30,41 @@ var generateKeyPair = function () {
     }
 };
 
-// hasing text by sha-512 algorithm
+// băm văn bản bằng thuật toán sha-512
 String.prototype.getHash = function () {
     return CryptoJS.SHA512(this).toString();
 }
 
-// symmetric 3DES encryption
+// mã hóa đối xứng 3DES
 String.prototype.symEncrypt = function (pass) {
     return CryptoJS.TripleDES.encrypt(this, pass).toString();
 }
 
-// symmetric 3DES decryption
+// giải mã đối xứng 3DES
 String.prototype.symDecrypt = function (pass) {
     var bytes = CryptoJS.TripleDES.decrypt(this, pass);
     return bytes.toString(CryptoJS.enc.Utf8);
 }
 
-// asymmetric RSA encryption
+// mã hóa bất đối xứng RSA
 String.prototype.asymEncrypt = function (publicKey) {
     rsa.setPublicKey(publicKey);
     return rsa.encrypt(this);
 }
 
-// asymmetric RSA decryption
+// giải mã bất đối xứng RSA
 String.prototype.asymDecrypt = function (privateKey) {
-    rsa.setPrivateKey(privateKey); // Set the private.
+    rsa.setPrivateKey(privateKey); // Thiết lập khóa riêng.
     return rsa.decrypt(this);
 }
 
+// hàm lấy các khóa mã hóa
 function getCipherKeys() {
-    var keys = localStorage.cipherKeys; // read keys json 
+    var keys = localStorage.cipherKeys; // đọc khóa từ json 
     if (keys == null) {
         keys = generateKeyPair();
 
-        // store keys as json in localStorage
+        // lưu trữ khóa dưới dạng json trong localStorage
         localStorage.cipherKeys = JSON.stringify(keys);
         return keys;
     }
