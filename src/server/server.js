@@ -1,6 +1,15 @@
 // File này được yêu cầu bởi app.js. Nó thiết lập trình xử lý sự kiện và lắng nghe tin nhắn socket.io.
 "use strict";
 const { Client } = require("pg");
+// Sử dụng module gravatar, để chuyển địa chỉ email thành hình ảnh avatar:
+var gravatar = require("gravatar");
+var manager = require("./manager.js");
+var crypto = require("crypto-js");
+var serverVersion = manager.generateGuid(); // một phiên bản duy nhất cho mỗi lần khởi động server
+var globalChannel = "environment"; // thêm bất kỳ người dùng đã xác thực vào kênh này
+var chat = {}; // socket.io
+var loginExpireTime = 3600 * 1000; // 3600s
+
 
 // Thông tin kết nối đến cơ sở dữ liệu PostgreSQL
 const connectionString = "postgresql://postgres:123456@localhost:5432/db_bmtt";
@@ -31,7 +40,22 @@ client
 // Hàm để thêm một người dùng mới vào cơ sở dữ liệu
 async function addUserToDatabase(user) {
   try {
-    const query = {
+    // Thực hiện truy vấn SELECT để kiểm tra xem người dùng đã tồn tại hay chưa
+    const selectQuery = {
+      text: "SELECT * FROM users WHERE id = $1",
+      values: [user.id],
+    };
+
+    const selectResult = await client.query(selectQuery);
+
+    // Nếu người dùng đã tồn tại trong cơ sở dữ liệu
+    if (selectResult.rows.length > 0) {
+      console.log("User already exists in database:", selectResult.rows[0]);
+      return; // Dừng hàm và không thực hiện thêm vào cơ sở dữ liệu
+    }
+
+    // Ngược lại, nếu người dùng chưa tồn tại, thực hiện truy vấn INSERT
+    const insertQuery = {
       text: "INSERT INTO users(id, socketid, username, email, password, avatar, status, last_login_date) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
       values: [
         user.id,
@@ -45,21 +69,21 @@ async function addUserToDatabase(user) {
       ],
     };
 
-    const result = await client.query(query);
-    console.log("User added to database:", result.rows[0]);
+    const insertResult = await client.query(insertQuery);
+    console.log("User added to database successfully:", insertResult.rowCount);
+
+    // Thực hiện lại truy vấn SELECT để lấy thông tin chi tiết của người dùng vừa thêm
+    const selectInsertedQuery = {
+      text: "SELECT * FROM users WHERE id = $1",
+      values: [user.id],
+    };
+
+    const selectInsertedResult = await client.query(selectInsertedQuery);
+    console.log("User details from database:", selectInsertedResult.rows[0]);
   } catch (err) {
     console.error("Error adding user to database:", err);
   }
 }
-
-// Sử dụng module gravatar, để chuyển địa chỉ email thành hình ảnh avatar:
-var gravatar = require("gravatar");
-var manager = require("./manager.js");
-var crypto = require("crypto-js");
-var serverVersion = manager.generateGuid(); // một phiên bản duy nhất cho mỗi lần khởi động server
-var globalChannel = "environment"; // thêm bất kỳ người dùng đã xác thực vào kênh này
-var chat = {}; // socket.io
-var loginExpireTime = 3600 * 1000; // 3600s
 
 // Xuất một hàm, để chúng ta có thể truyền
 // các instance app và io từ file app.js:
@@ -69,8 +93,7 @@ module.exports = function (app, io) {
   io.on("connection", function (socket) {
     console.info(`socket: ${socket.id} connected`);
 
-    // Khi client phát ra 'login', lưu tên và avatar của họ,
-    // và thêm họ vào kênhl
+    // Khi client phát ra 'login', lưu tên và avatar của họ, và thêm họ vào kênhl
     socket.on("login", (data) => {
       // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
       var userHashedPass = crypto.TripleDES.decrypt(
@@ -101,56 +124,59 @@ module.exports = function (app, io) {
         // người dùng mới
         // Sử dụng đối tượng socket để lưu trữ dữ liệu. Mỗi client nhận được
         // đối tượng socket duy nhất của họ
-
+        
         var newUser = {
-          id: data.email.hashCode(),
+          id: data.email.hashCode(), // Mã hóa email để làm id
           socketid: socket.id,
           username: data.username,
           email: data.email,
           password: userHashedPass, // Lưu trữ Mật khẩu Băm để client đăng nhập xác thực một người dùng mỗi email
-          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
-          status: "online", // { "online", "offline" }
-          lastLoginDate: Date.now(), // thời gian đăng nhập cuối cùng theo thời gian máy chủ
+          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), // Tạo avatar từ Gravatar
+          status: "online", // Mặc định online khi đăng ký
+          lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
         };
+
         // Thêm người dùng mới vào cơ sở dữ liệu
         addUserToDatabase(newUser);
 
         // Lưu thông tin người dùng vào manager
         manager.clients[newUser.email.hashCode()] = newUser;
 
-        // manager.clients[user.id] = user;
         // Đăng nhập người dùng mới
         userSigned(newUser, socket);
       }
     }); // login
+
+
   }); // connected user - phạm vi socket
 }; // module.export func
 
 function userSigned(user, socket) {
+  // Đánh dấu người dùng là "online" và gán socket id cho người dùng
   user.status = "online";
   user.socketid = socket.id;
   socket.user = user;
   //
-  // send success ack to user by self data object
+  // Gửi phản hồi thành công cho người dùng với thông tin đã đăng ký
   socket.emit("signed", {
     id: user.id,
     username: user.username,
     email: user.email,
     avatar: user.avatar,
     status: user.status,
-    serverVersion: serverVersion, // chance of this version caused to refresh clients cached data
+    serverVersion: serverVersion, // Phiên bản server để làm mới dữ liệu cache của client
   });
 
-  socket.join(globalChannel); // join all users in global authenticated group
+  socket.join(globalChannel); // Tham gia vào nhóm chung cho tất cả người dùng đã xác thực
 
-  // add user to all joined channels
-  var userChannels = manager.getUserChannels(user.id, true); // by p2p channel
+  // Thêm người dùng vào tất cả các kênh đã tham gia
+  var userChannels = manager.getUserChannels(user.id, true); // Lấy danh sách kênh p2p của người dùng
   for (var channel in userChannels) {
     socket.join(channel);
   }
 
-  updateAllUsers();
-  defineSocketEvents(socket);
+  updateAllUsers(); // Cập nhật danh sách người dùng cho tất cả
+  defineSocketEvents(socket); // Định nghĩa các sự kiện socket
 
   console.info(
     `User <${user.username}> by socket <${user.socketid}> connected`
@@ -158,7 +184,7 @@ function userSigned(user, socket) {
 } // signed-in
 
 function updateAllUsers() {
-  // tell new user added and list updated to everyone except the socket that starts it
+  // Thông báo cho tất cả người dùng khác về sự thêm mới và cập nhật danh sách người dùng và kênh
   chat.sockets.in(globalChannel).emit("update", {
     users: manager.getUsers(),
     channels: manager.getChannels(),
@@ -166,6 +192,7 @@ function updateAllUsers() {
 }
 
 function createChannel(name, user, p2p) {
+  // Tạo một kênh mới với thông tin nhất định và thêm người dùng làm quản trị viên
   var channel = {
     name: name,
     p2p: p2p,
@@ -174,17 +201,17 @@ function createChannel(name, user, p2p) {
     users: [user.id],
   };
   manager.channels[name] = channel;
-  chat.sockets.connected[user.socketid].join(name); // add admin to self chat
+  chat.sockets.connected[user.socketid].join(name); // Thêm người dùng làm quản trị viên vào kênh
   return channel;
 }
 
 function defineSocketEvents(socket) {
-  // Somebody left the chat
+  // Xử lý khi có người dùng ngắt kết nối
   socket.on("disconnect", () => {
-    // Upon disconnection, sockets leave all the channels they were part of automatically,
-    // and no special teardown is needed on this part.
+    // Khi ngắt kết nối, socket sẽ tự động rời khỏi tất cả các kênh mà nó đã tham gia
+    // Không cần thêm bất kỳ thao tác nào đặc biệt ở đây
 
-    // find user who abandon sockets
+    // Tìm người dùng đã ngắt kết nối
     var user = socket.user || manager.findUser(socket.id);
     if (user) {
       console.warn(
@@ -192,8 +219,7 @@ function defineSocketEvents(socket) {
       );
       user.status = "offline";
 
-      // Notify the other person in the chat channel
-      // that his partner has left
+      // Thông báo cho người dùng khác trong kênh chat rằng đối phương đã rời khỏi
       socket.broadcast.to(globalChannel).emit("leave", {
         username: user.username,
         id: user.id,
@@ -203,7 +229,7 @@ function defineSocketEvents(socket) {
     }
   });
 
-  // Handle the sending of messages
+  // Xử lý khi có tin nhắn được gửi đi
   socket.on("msg", (data) => {
     var from = socket.user || manager.findUser(socket.id);
     var channel = manager.channels[data.to];
@@ -218,22 +244,22 @@ function defineSocketEvents(socket) {
 
       data.date = Date.now();
       data.type = "msg";
-      // When the server receives a message, it sends it to the all clients, so also to sender
+      // Khi server nhận được tin nhắn, nó sẽ gửi tin nhắn đó đến tất cả các client trong kênh, bao gồm cả người gửi
       chat.sockets.in(channel.name).emit("receive", data);
       msg.push(data);
     }
   });
 
-  // Handle the request of users for chat
+  // Xử lý khi có yêu cầu chat từ người dùng
   socket.on("request", (data) => {
-    // find user who requested to this chat by socket id
+    // Tìm người dùng gửi yêu cầu chat bằng socket id
     var from = socket.user || manager.findUser(socket.id);
 
-    // if user authenticated
+    // Nếu người dùng đã xác thực
     if (from) {
-      data.from = from.id; // inject user id in data
+      data.from = from.id; // Thêm id của người dùng vào dữ liệu yêu cầu
 
-      // find admin user who should be send request to
+      // Tìm người dùng quản trị phù hợp để gửi yêu cầu tới
       var adminUser = manager.getAdminFromChannelName(data.channel, from.id);
 
       if (adminUser) {
@@ -253,32 +279,32 @@ function defineSocketEvents(socket) {
       }
     }
     //
-    // from or adminUser is null
+    // Nếu from hoặc adminUser là null
     socket.emit("exception", "The requested chat not found!");
   });
 
-  // Handle the request of users for chat
+  // Xử lý khi có yêu cầu chấp nhận chat từ người dùng
   socket.on("accept", (data) => {
-    // find user who accepted to this chat by socket id
+    // Tìm người dùng chấp nhận yêu cầu chat bằng socket id
     var from = socket.user || manager.findUser(socket.id);
 
-    // find user who is target user by user id
+    // Tìm người dùng mục tiêu để chấp nhận chat bằng user id
     var to = manager.clients[data.to];
 
-    // if users authenticated
+    // Nếu cả hai người dùng đã xác thực
     if (from != null && to != null) {
       var channel = manager.channels[data.channel];
 
       if (channel == null) {
-        // new p2p channel
+        // Tạo kênh p2p mới
         channel = createChannel(data.channel, from, true);
       }
       //
-      // add new user to this channel
+      // Thêm người dùng mới vào kênh này
       channel.users.push(to.id);
-      chat.sockets.connected[to.socketid].join(channel.name); // add new user to chat channel
+      chat.sockets.connected[to.socketid].join(channel.name); // Thêm người dùng mới vào kênh chat
 
-      // send accept msg to user which requested to chat
+      // Gửi tin nhắn chấp nhận cho người dùng đã gửi yêu cầu chat
       socket.to(to.socketid).emit("accept", {
         from: from.id,
         channel: channel.name,
@@ -288,13 +314,13 @@ function defineSocketEvents(socket) {
     }
   });
 
-  // Handle the request to create channel
+  // Xử lý khi có yêu cầu tạo kênh mới
   socket.on("createChannel", (name) => {
     var from = socket.user;
     var channel = manager.channels[name];
 
     if (channel) {
-      // the given channel name is already exist!
+      // Tên kênh đã tồn tại
       socket.emit("reject", {
         from: from.id,
         p2p: false,
@@ -304,7 +330,7 @@ function defineSocketEvents(socket) {
       return;
     }
 
-    // create new channel
+    // Tạo kênh mới
     channel = createChannel(name, from, false);
     updateAllUsers();
 
@@ -313,15 +339,15 @@ function defineSocketEvents(socket) {
     );
   });
 
-  // Handle the request of users for chat
+  // Xử lý khi có yêu cầu từ chối chat
   socket.on("reject", (data) => {
-    // find user who accepted to this chat by socket id
+    // Tìm người dùng từ chối chat bằng socket id
     var from = socket.user || manager.findUser(socket.id);
 
-    // find user who is target user by user id
+    // Tìm người dùng mục tiêu để từ chối chat bằng user id
     var to = manager.clients[data.to];
 
-    // if users authenticated
+    // Nếu cả hai người dùng đã xác thực
     if (from != null && to != null) {
       var channel = manager.channels[data.channel];
       socket.to(to.socketid).emit("reject", {
@@ -332,14 +358,14 @@ function defineSocketEvents(socket) {
     }
   });
 
-  // Handle the request of users for chat
+  // Xử lý khi có yêu cầu fetch-messages từ người dùng
   socket.on("fetch-messages", (channelName) => {
     // find fetcher user
     var fetcher = socket.user || manager.findUser(socket.id);
 
     var channel = manager.channels[channelName];
 
-    // check fetcher was a user of channel
+    // Kiểm tra fetcher đã là thành viên của kênh chưa
     if (
       fetcher != null &&
       channel != null &&
@@ -355,7 +381,7 @@ function defineSocketEvents(socket) {
         `you are not joined in <${channelName}> channel or maybe the server was lost your data!!!`
       );
   });
-
+  // Xử lý khi có yêu cầu typing từ người dùng
   socket.on("typing", (channelName) => {
     var user = socket.user || manager.findUser(socket.id);
     var channel = manager.channels[channelName];
@@ -367,7 +393,7 @@ function defineSocketEvents(socket) {
     }
   });
 
-  // Thêm sự kiện lắng nghe logout
+  // Xử lý khi có yêu cầu logout từ người dùng
   socket.on("logout", (data) => {
     var user = manager.clients[data.userId];
     if (user) {

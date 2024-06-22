@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "database": "db_bmtt",
+            "username": "postgres",
+            "password": "123456",
+            "name": "DB_BMTT"
+        }
+    ]
+}
