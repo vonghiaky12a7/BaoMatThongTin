@@ -598,10 +598,6 @@ function getNoncePassword(pass) {
 
     $(thisAlert).removeClass("alert-validate");
   }
-})(jQuery);
-
-$(document).ready(function () {
-  // Lắng nghe sự kiện click trên button "Register"
   $("#registerButton").click(function () {
     $("#registerForm").css("display", "none");
     $("#loginForm").css("display", "block");
@@ -621,7 +617,8 @@ $(document).ready(function () {
 
   // Sự kiện click cho nút "Register"
   $("#registerButton").click(function () {
-    var username = $("#yourName").val();
-    $("#yourUsername").val(username);
+    var username = $("#yourUsername").val();
+    $("#yourName").val(username);
   });
-});
+})(jQuery);
+
