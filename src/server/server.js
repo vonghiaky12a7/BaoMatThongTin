@@ -10,7 +10,6 @@ var globalChannel = "environment"; // thêm bất kỳ người dùng đã xác 
 var chat = {}; // socket.io
 var loginExpireTime = 3600 * 1000; // 3600s
 
-
 // Thông tin kết nối đến cơ sở dữ liệu PostgreSQL
 const connectionString = "postgresql://postgres:123456@localhost:5432/db_bmtt";
 
@@ -51,14 +50,15 @@ async function addUserToDatabase(user) {
     // Nếu người dùng đã tồn tại trong cơ sở dữ liệu
     if (selectResult.rows.length > 0) {
       console.log("User already exists in database:", selectResult.rows[0]);
+      document.getElementById("username-error").textContent =
+        "Username already exists.";
       return; // Dừng hàm và không thực hiện thêm vào cơ sở dữ liệu
     }
 
     // Ngược lại, nếu người dùng chưa tồn tại, thực hiện truy vấn INSERT
     const insertQuery = {
-      text: "INSERT INTO users(id, socketid, username, email, password, avatar, status, last_login_date) VALUES($1, $2, $3, $4, $5, $6, $7, $8)",
+      text: "INSERT INTO users(socketid, username, email, password, avatar, status, last_login_date) VALUES($1, $2, $3, $4, $5, $6, $7)",
       values: [
-        user.id,
         user.socketid,
         user.username,
         user.email,
@@ -94,7 +94,7 @@ module.exports = function (app, io) {
     console.info(`socket: ${socket.id} connected`);
 
     // Khi client phát ra 'login', lưu tên và avatar của họ, và thêm họ vào kênhl
-    socket.on("login", (data) => {
+    socket.on("login", async (data) => {
       // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
       var userHashedPass = crypto.TripleDES.decrypt(
         data.password,
@@ -124,8 +124,17 @@ module.exports = function (app, io) {
         // người dùng mới
         // Sử dụng đối tượng socket để lưu trữ dữ liệu. Mỗi client nhận được
         // đối tượng socket duy nhất của họ
-        
+
         var newUser = {
+          socketid: socket.id,
+          username: data.username,
+          email: data.email,
+          password: userHashedPass, // Lưu trữ Mật khẩu Băm để client đăng nhập xác thực một người dùng mỗi email
+          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), // Tạo avatar từ Gravatar
+          status: "online", // Mặc định online khi đăng ký
+          lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
+        };
+        var newUserLocal = {
           id: data.email.hashCode(), // Mã hóa email để làm id
           socketid: socket.id,
           username: data.username,
@@ -135,19 +144,16 @@ module.exports = function (app, io) {
           status: "online", // Mặc định online khi đăng ký
           lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
         };
-
         // Thêm người dùng mới vào cơ sở dữ liệu
         addUserToDatabase(newUser);
 
         // Lưu thông tin người dùng vào manager
-        manager.clients[newUser.email.hashCode()] = newUser;
+        manager.clients[newUserLocal.email.hashCode()] = newUserLocal;
 
         // Đăng nhập người dùng mới
-        userSigned(newUser, socket);
+        userSigned(newUserLocal, socket);
       }
     }); // login
-
-
   }); // connected user - phạm vi socket
 }; // module.export func
 
