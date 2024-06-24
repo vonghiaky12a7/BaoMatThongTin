@@ -143,7 +143,7 @@ socket.on("request", (data) => {
 
 // khi yêu cầu chat của tôi được chấp nhận bởi admin kênh
 socket.on("accept", (data) => {
-  // decrypt RSA cipher by my pricate key
+  // giải mã mật mã RSA bằng khóa riêng của tôi
   var symmetricKey = data.channelKey.asymDecrypt(keys.privateKey);
   //
   // lưu trữ kênh này vào danh sách kênh của tôi
