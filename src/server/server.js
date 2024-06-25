@@ -129,19 +129,19 @@ module.exports = function (app, io) {
           socketid: socket.id,
           username: data.username,
           email: data.email,
-          password: userHashedPass, // Lưu trữ Mật khẩu Băm để client đăng nhập xác thực một người dùng mỗi email
-          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), // Tạo avatar từ Gravatar
-          status: "online", // Mặc định online khi đăng ký
-          lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
+          password: userHashedPass,
+          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), 
+          status: "online", 
+          lastLoginDate: Date.now(),
         };
         var newUserLocal = {
           id: data.email.hashCode(), // Mã hóa email để làm id
           socketid: socket.id,
           username: data.username,
           email: data.email,
-          password: userHashedPass, // Lưu trữ Mật khẩu Băm để client đăng nhập xác thực một người dùng mỗi email
-          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), // Tạo avatar từ Gravatar
-          status: "online", // Mặc định online khi đăng ký
+          password: userHashedPass, 
+          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
+          status: "online", 
           lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
         };
         // Thêm người dùng mới vào cơ sở dữ liệu
