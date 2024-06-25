@@ -130,8 +130,8 @@ module.exports = function (app, io) {
           username: data.username,
           email: data.email,
           password: userHashedPass,
-          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }), 
-          status: "online", 
+          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
+          status: "online",
           lastLoginDate: Date.now(),
         };
         var newUserLocal = {
@@ -139,11 +139,12 @@ module.exports = function (app, io) {
           socketid: socket.id,
           username: data.username,
           email: data.email,
-          password: userHashedPass, 
+          password: userHashedPass,
           avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
-          status: "online", 
+          status: "online",
           lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
         };
+
         // Thêm người dùng mới vào cơ sở dữ liệu
         addUserToDatabase(newUser);
 
