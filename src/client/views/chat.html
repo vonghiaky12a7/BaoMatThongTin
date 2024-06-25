@@ -26,15 +26,14 @@
         <!-- Register Section -->
         <div id="registerForm" class="login100-form validate-form">
           <span class="login100-form-logo">
-            <img id="registerAvatar" src="../img/unnamed.png" alt="avatar" />
+            <img id="yourAvatar" src="../img/unnamed.png" alt="avatar" />
           </span>
 
           <span class="register100-form-title">Register</span>
 
           <div class="wrap-input100 validate-input" data-validate="Enter username">
-            <input id="yourUsername" class="input100" type="text" name="username" placeholder="Username" />
+            <input id="yourName" class="input100" type="text" name="username" placeholder="Username" />
             <span class="focus-input100"></span>
-            <span id="username-error" style="color: red;"></span>
           </div>
 
           <div class="wrap-input100 validate-input" data-validate="Enter email">
@@ -60,7 +59,7 @@
 
           <span class="login100-form-title">Login</span>
           <div class="wrap-input100 validate-input" data-validate="Enter username" hidden>
-            <input id="yourName" class="input100" type="text" name="username" placeholder="Username">
+            <input id="yourUsername" class="input100" type="text" name="username" placeholder="Username">
             <span class="focus-input100"></span>
           </div>
           <div class="wrap-input100 validate-input" data-validate="Enter email">
@@ -131,7 +130,6 @@
       </div>
       <div class="message-input">
         <div class="wrap">
-          <input type="file" id="fileInput" style="display:none" />
           <input type="text" placeholder="Write your message..." />
           <i class="fa fa-paperclip attachment" aria-hidden="true" onclick="document.getElementById('fileInput').click()"></i>
           <button class="submit">

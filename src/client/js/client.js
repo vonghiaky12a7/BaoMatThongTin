@@ -405,7 +405,8 @@ function newMessage() {
     to: currentChannelName,
     avatar: getMe().avatar,
   });
-
+  // Log tin nhắn đã mã hóa vào console
+  console.log("Encrypted message:", msg);
   // Xóa nội dung trong ô nhập tin nhắn
   $(".message-input input").val(null);
   $(".message-input input").focus();
@@ -598,6 +599,10 @@ function getNoncePassword(pass) {
 
     $(thisAlert).removeClass("alert-validate");
   }
+})(jQuery);
+
+$(document).ready(function () {
+  // Lắng nghe sự kiện click trên button "Register"
   $("#registerButton").click(function () {
     $("#registerForm").css("display", "none");
     $("#loginForm").css("display", "block");
@@ -617,8 +622,7 @@ function getNoncePassword(pass) {
 
   // Sự kiện click cho nút "Register"
   $("#registerButton").click(function () {
-    var username = $("#yourUsername").val();
-    $("#yourName").val(username);
+    var username = $("#yourName").val();
+    $("#yourUsername").val(username);
   });
-})(jQuery);
-
+});

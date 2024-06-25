@@ -1,11 +1,11 @@
 // Đây là file chính của ứng dụng chat. Nó khởi tạo một instance mới của
 // express.js, yêu cầu các file config và routes, và lắng nghe trên một cổng.
-var express = require('express');
+var express = require("express");
 var path = require("path");
 var app = express();
 var port = 80;
 
-// Khởi tạo một đối tượng socket.io mới. Nó được gắn kết với 
+// Khởi tạo một đối tượng socket.io mới. Nó được gắn kết với
 // ứng dụng express, cho phép chúng cùng tồn tại.
 var io = require("socket.io").listen(app.listen(port));
 
@@ -21,7 +21,6 @@ app.set("views", path.join(__dirname, "client/views"));
 
 // Làm cho các file trong thư mục public có sẵn
 app.use(express.static(path.join(__dirname, "client")));
-
 
 // Cấu hình Router
 // thiết lập các listener sự kiện cho hai endpoint URL chính của ứng dụng - /
