@@ -146,7 +146,6 @@ async function updateUserInDatabase(user) {
 // Hàm để xử lý đăng ký người dùng
 async function handleRegister(socket, data) {
   try {
-
     // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
     var userHashedPass = crypto.TripleDES.decrypt(
       data.password,
@@ -358,14 +357,6 @@ function createChannel(name, user, p2p) {
   return channel;
 }
 
-// chỉ xóa tin của tôi
-function deleteMessagesFromUser(userId, channelName) {
-  if (manager.messages[channelName]) {
-    manager.messages[channelName] = manager.messages[channelName].filter(
-      (msg) => msg.from !== userId
-    );
-  }
-}
 function defineSocketEvents(socket) {
   // Xử lý khi có người dùng ngắt kết nối
   socket.on("disconnect", () => {
@@ -539,17 +530,6 @@ function defineSocketEvents(socket) {
     var user = manager.clients[data.userId];
 
     if (user) {
-      // Xóa tin nhắn của người dùng khỏi tất cả các kênh mà người dùng tham gia
-      for (var channelName in manager.channels) {
-        if (manager.channels[channelName].users.includes(user.id)) {
-          deleteMessagesFromUser(user.id, channelName);
-          // Thông báo cho tất cả các client trong kênh đó
-          chat.sockets.in(channelName).emit("updateMessages", {
-            channelName: channelName,
-            messages: manager.messages[channelName],
-          });
-        }
-      }
       user.status = "offline";
       console.info(`User <${user.username}> has logged out`);
       updateAllUsers();

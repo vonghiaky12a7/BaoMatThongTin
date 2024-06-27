@@ -402,26 +402,6 @@ function signedin(me) {
   $(".limiter").remove();
   $("#frame").css("display", "block");
 }
-// Hàm cập nhật danh sách tin nhắn trên giao diện
-function updateMessageList(messages) {
-  // Xóa danh sách tin nhắn hiện tại
-  const messageContainer = document.getElementById("messageContainer");
-  messageContainer.innerHTML = '';
-
-  // Thêm các tin nhắn mới
-  messages.forEach(msg => {
-    const messageElement = document.createElement("div");
-    messageElement.className = "message";
-    messageElement.innerText = msg.msg; // Giả sử msg.msg chứa nội dung tin nhắn
-    messageContainer.appendChild(messageElement);
-  });
-}
-// Lắng nghe sự kiện updateMessages từ server
-socket.on("updateMessages", (data) => {
-  if (data.channelName === currentChannel) {
-    updateMessageList(data.messages);
-  }
-});
 
 function updateMessages() {
   // Hiển thị các tin nhắn cũ
