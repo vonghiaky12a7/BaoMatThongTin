@@ -350,10 +350,12 @@ button.login100-form-btn:hover {
 /*------------------------------------------------------------------
 [ Alert validate ]*/
 
-.validate-input {
+.validate-register {
   position: relative;
 }
-
+.validate-login {
+  position: relative;
+}
 .alert-validate::before {
   content: attr(data-validate);
   position: absolute;

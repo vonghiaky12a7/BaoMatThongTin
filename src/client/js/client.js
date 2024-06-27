@@ -23,14 +23,30 @@ socket.on("connect", () => {
     socket.emit("login", me);
   }
 });
+// Xử lý khi đăng nhập thất bại
+socket.on("loginFailed", (message) => {
+  console.log(message); // Hiển thị thông báo lỗi nếu có
+  var me = getMe();
+  if (me && localStorage.hashedPass) {
+    // nonce password
+    me.password = getNoncePassword(localStorage.hashedPass);
+    socket.emit("register", me);
+  }
+});
+socket.on("registerSuccess", (message) => {
+  alert(message); // Hiển thị thông báo đăng ký thành công
+  // Chuyển người dùng sang trang đăng nhập hoặc hiển thị form đăng <n></n>hập
+  $("#registerForm").hide();
+  $("#loginForm").show();
+});
 
 // khi phiên đăng nhập của tôi hết hạn từ thời gian máy chủ
 socket.on("resign", () => {
+  console.log("Re-login");
   var me = getMe();
   $(".login100-form-title").html("Login");
-  $("#yourName").val(me.username);
-  $("#yourEmail").val(me.email);
-  $("#yourAvatar").attr("src", me.avatar);
+  $("#loginEmail").val(me.email);
+  $("#loginAvatar").attr("src", me.avatar);
 });
 
 // khi tôi bị ngắt kết nối từ server, đổi trạng thái của tôi thành offline
@@ -39,13 +55,19 @@ socket.on("disconnect", () => {
   setConnectionStatus("disconnected");
 });
 
-// khi có ngoại lệ từ máy chủ gọi
+// khi có lỗi khi đến server
+socket.on("userExits", (err) => {
+  alert(err);
+});
 socket.on("exception", (err) => {
   alert(err);
 });
 
-// lưu dữ liệu người dùng của tôi khi tôi đăng nhập thành công tới serve
-socket.on("signed", signedin);
+// lưu dữ liệu người dùng của tôi khi tôi đăng nhập thành công tới server
+socket.on("signed", (me) => {
+  console.log("Dữ liệu nhận được từ server:", me); // Log dữ liệu để kiểm tra
+  signedin(me);
+});
 
 // cập nhật dữ liệu người dùng và kênh khi trạng thái của họ thay đổi
 socket.on("update", (data) => {
@@ -54,7 +76,7 @@ socket.on("update", (data) => {
   $("#userContacts").empty();
   $("#channelContacts").empty();
 
-  delete lstUsers[getMe().id]; // loại bỏ tôi khỏi danh sách người dùng
+  delete lstUsers[getMe().id]; // loại bỏ bản than khỏi danh sách người dùng
   for (var prop in lstUsers) {
     var user = lstUsers[prop];
     var channel = getChannelName(user.id);
@@ -89,11 +111,10 @@ socket.on("leave", (leftedUser) => {
   if (u != null) {
     u.status = leftedUser.status;
     var chat = getChannelName(u.id);
-    $(`#${getChannelName(u.id)}`).html(getUserLink(u, chat));
+    $(`#${chat}`).html(getUserLink(u, chat));
   }
 });
 
-// khi một người dùng yêu cầu trò chuyện với tôi hoặc tham gia kênh mà tôi là admin
 socket.on("request", (data) => {
   var reqUser = lstUsers[data.from];
   if (reqUser == null) {
@@ -108,7 +129,7 @@ socket.on("request", (data) => {
   var reqChannel = getChannels()[data.channel];
 
   if (reqChannel == null) {
-    // không tồn tại trong danh sách kênh, nên đây là một kênh p2p mới!
+    // không tồn tại trong danh sách kênh
     // hỏi tôi chấp nhận hay từ chối yêu cầu người dùng
     if (
       confirm(`Do you allow <${reqUser.username}> to chat with you?`) == false
@@ -116,7 +137,6 @@ socket.on("request", (data) => {
       socket.emit("reject", { to: data.from, channel: data.channel });
       return;
     }
-    // wow, accepted...
     createChannel(data.channel, true);
     reqChannel = getChannels()[data.channel];
   } else if (reqChannel.p2p === false) {
@@ -133,6 +153,12 @@ socket.on("request", (data) => {
   // mã hóa khóa chat symmetricKey bằng khóa công khai của người dùng yêu cầu
   var encryptedChannelKey = reqChannel.channelKey.asymEncrypt(data.pubKey);
   // gửi dữ liệu đến người dùng yêu cầu để tham gia vào kênh hiện tại
+  console.log(
+    "Encrypts the chat key symmetricKey with the requesting user's public key:"
+  );
+  console.log("Public key: " + data.pubKey);
+  console.log("Encrypted Channel Key: " + encryptedChannelKey);
+
   socket.emit("accept", {
     to: data.from,
     channelKey: encryptedChannelKey,
@@ -145,7 +171,11 @@ socket.on("request", (data) => {
 socket.on("accept", (data) => {
   // giải mã mật mã RSA bằng khóa riêng của tôi
   var symmetricKey = data.channelKey.asymDecrypt(keys.privateKey);
-  //
+  console.log(
+    "My chat request was accepted by the channel admin, decrypting the RSA with my private key:\n"
+  );
+  console.log("Private key: " + keys.privateKey);
+  console.log("Decrypted Channel Key: " + symmetricKey);
   // lưu trữ kênh này vào danh sách kênh của tôi
   setChannel(data.channel, {
     name: data.channel,
@@ -158,11 +188,11 @@ socket.on("accept", (data) => {
 // khi yêu cầu chat của tôi bị từ chối bởi admin kênh
 socket.on("reject", (data) => {
   var admin = lstUsers[data.from];
-  var reason = data.msg == null ? "" : "because " + data.msg;
+  var reason = data.msg ? `because ${data.msg}` : "";
   if (data.p2p)
-    alert(`Your request to chat by <${admin.username}> rejected. ${reason}`);
+    alert(`Your chat request to <${admin.username}> rejected. ${reason}`);
   else
-    alert(`Your join request to <${data.channel}> channel rejected. ${reason}`);
+    alert(`Your join request to <${data.channel}> channel rejected ${reason}`);
 
   $(`#${data.channel}`).find(".wait").css("display", "none");
 });
@@ -180,7 +210,8 @@ socket.on("receive", (data) => {
     var badge = $(`#${data.to}`).find(".badge");
     var badgeVal = badge.attr("data-badge");
     if (badgeVal == "") badgeVal = 0;
-    badge.attr("data-badge", parseInt(badgeVal) + 1);
+    // badge.attr("data-badge", parseInt(badgeVal) + 1);
+    badge.attr("data-badge", (badgeVal ? parseInt(badgeVal) : 0) + 1);
   }
 
   getMessages(data.to).push(data);
@@ -322,12 +353,13 @@ function getChannels() {
 
 function setMe(data) {
   var lastMe = getMe();
-
+  console.log("last me trong setme:  "+ lastMe);
   if (lastMe && lastMe.serverVersion !== data.serverVersion) {
+    // Nếu thông tin người dùng hiện tại tồn tại và phiên bản máy chủ đã thay đổi
     // Máy chủ khởi động lại, nên làm mới dữ liệu đã lưu
-    localStorage.channels = "{}";
+    localStorage.channels = "{}"; // Làm mới dữ liệu các kênh
   }
-  localStorage.me = JSON.stringify(data);
+  localStorage.me = JSON.stringify(data); // Lưu trữ thông tin người dùng mới vào localStorage
 }
 
 function getMe() {
@@ -336,7 +368,7 @@ function getMe() {
 
   return JSON.parse(me);
 }
-
+//check trang thai cua nguoi dung
 function setConnectionStatus(state) {
   $("#profile-img").removeClass();
 
@@ -352,7 +384,7 @@ function chatStarted(channel) {
   $("li").removeClass("active");
   var contact = $(`#${channel}`);
   contact.addClass("active");
-  contact.find(".badge").attr("data-badge", ""); // remove badge
+  contact.find(".badge").attr("data-badge", "");
   $("#channel-profile-img").attr("src", contact.find("img").attr("src"));
   $("#channel-profile-name").html(contact.find(".name").html());
   contact.find(".wait").css("display", "none");
@@ -370,6 +402,26 @@ function signedin(me) {
   $(".limiter").remove();
   $("#frame").css("display", "block");
 }
+// Hàm cập nhật danh sách tin nhắn trên giao diện
+function updateMessageList(messages) {
+  // Xóa danh sách tin nhắn hiện tại
+  const messageContainer = document.getElementById("messageContainer");
+  messageContainer.innerHTML = '';
+
+  // Thêm các tin nhắn mới
+  messages.forEach(msg => {
+    const messageElement = document.createElement("div");
+    messageElement.className = "message";
+    messageElement.innerText = msg.msg; // Giả sử msg.msg chứa nội dung tin nhắn
+    messageContainer.appendChild(messageElement);
+  });
+}
+// Lắng nghe sự kiện updateMessages từ server
+socket.on("updateMessages", (data) => {
+  if (data.channelName === currentChannel) {
+    updateMessageList(data.messages);
+  }
+});
 
 function updateMessages() {
   // Hiển thị các tin nhắn cũ
@@ -384,27 +436,35 @@ function updateMessages() {
 }
 
 function newMessage() {
-  var message = $(".message-input input").val();
+  const message = $(".message-input input").val();
   if ($.trim(message) == "") {
+      console.log("message rỗng:");
     return false;
   }
 
   if (currentChannelName == null || currentChannelName == "") {
     alert("Please first select a chat to sending message!");
+     console.log("currentChannelName rỗng:");
     return false;
   }
-
   // Lấy khóa đối xứng của kênh và mã hóa tin nhắn
-  var chatSymmetricKey = getChannels()[currentChannelName].channelKey;
-  var msg = message.symEncrypt(chatSymmetricKey);
+  const chatSymmetricKey = getChannels()[currentChannelName].channelKey;
+  const Encryptmsg = message.symEncrypt(chatSymmetricKey);
 
   // Gửi tin nhắn đến kênh trò chuyện
   socket.emit("msg", {
-    msg: msg,
+    msg: Encryptmsg,
     from: getMe().id,
     to: currentChannelName,
     avatar: getMe().avatar,
   });
+
+  // Log tin nhắn đã mã hóa và các key vào console
+  console.log("Chat Symmetric Key: " + chatSymmetricKey);
+  console.log("Message: " + message);
+  console.log("Encrypted message:", Encryptmsg);
+  console.log("Private Key:", keys.privateKey);
+  console.log("Public Key:", keys.publicKey);
 
   // Xóa nội dung trong ô nhập tin nhắn
   $(".message-input input").val(null);
@@ -430,7 +490,6 @@ function appendMessage(data) {
   var symmetricKey = getChannels()[currentChannelName].channelKey;
   var msg = data.msg.symDecrypt(symmetricKey);
 
-  // add to self screen
   var messagesScreen = $(".messages");
   messagesScreen
     .find("ul")
@@ -439,7 +498,7 @@ function appendMessage(data) {
     ); // Thêm tin nhắn vào cuối trang
   messagesScreen.scrollTop(messagesScreen[0].scrollHeight); // scroll to end of messages page
 }
-
+// nhận tin nhắn
 function getMessages(channel) {
   var msgArray = channelMessages[channel];
   if (msgArray == null) {
@@ -448,11 +507,9 @@ function getMessages(channel) {
     return [];
   } else return msgArray;
 }
-
+// tạo một kênh mới
 function createChannel(channel, p2p) {
   if (lstChannels[channel]) return false;
-
-  // Socket của tôi là quản trị viên cho kênh này
   // Tạo khóa đối xứng
   var symmetricKey = generateKey(50);
   //
@@ -467,10 +524,8 @@ function getNoncePassword(pass) {
   return pass.symEncrypt(socket.id);
 }
 
-// ------------------------------------ Jquery DOM Events -------------------------------------
-
 (function ($) {
-  "use strict";
+  ("use strict");
 
   /*==================================================================
 	[ Mở rộng hồ sơ ]*/
@@ -497,14 +552,12 @@ function getNoncePassword(pass) {
 
   /*==================================================================
 	[ Ấn Enter để đăng nhập ]*/
-  $(".validate-input").on("keydown", function (e) {
+  $(".validate-login").on("keydown", function (e) {
     if (e.which == 13) {
       $("#loginButton").click();
     }
   });
 
-  /*==================================================================
-	[ Tập trung vào ô nhập ]*/
   $(".input100").each(function () {
     $(this).on("blur", function () {
       if ($(this).val().trim() != "") {
@@ -516,13 +569,12 @@ function getNoncePassword(pass) {
   });
 
   /*==================================================================
-	[ Thêm nút kênh ]*/
+	[ nút tạo kênh ]*/
   $("#addchannel").on("click", () => {
     var name = prompt("Please enter channel name:", "Channel");
     if (name) {
-      name = name.replace(/ /g, "_"); // replace all space to _
+      name = name.replace(/ /g, "_");
       if (createChannel(name, false)) {
-        // send data to requester user to join in current channel
         socket.emit("createChannel", name);
       } else {
         alert(`The <${name}> channel name already exist`);
@@ -532,30 +584,83 @@ function getNoncePassword(pass) {
 
   /*==================================================================
 	[ Xác thực ]*/
-  var input = $(".validate-input .input100");
+  var registerInputs = $(".validate-register .input100");
+  var loginInputs = $(".validate-login .input100");
 
-  // Submit login div
-  $("#loginButton").on("click", () => {
+  $("#registerButton").on("click", () => {
+    console.log("Register button clicked");
     // Xác thực dữ liệu
     var check = true;
-    for (var i = 0; i < input.length; i++) {
-      if (validate(input[i]) == false) {
-        showValidate(input[i]);
+    for (var i = 0; i < registerInputs.length; i++) {
+      if (validate(registerInputs[i]) == false) {
+        showValidate(registerInputs[i]);
+        check = false;
+      }
+    }
+    console.log(check + "1");
+    if (check) {
+      console.log(check + "2");
+      // Nếu dữ liệu đăng nhập hợp lệ thì:
+      var name = $.trim($("#registerName").val());
+      var email = $("#registerEmail").val();
+      var pass = $("#registerPass").val();
+
+      localStorage.hashedPass = pass.getHash(); // lưu trữ mật khẩu đc băm
+      var noncePass = getNoncePassword(localStorage.hashedPass);
+
+      console.log("Registered username: " + name);
+      console.log("Registered user email: " + email);
+      console.log("Registered user password: " + pass);
+      console.log("Hash the password using SHA-512: " + pass.getHash());
+      console.log(
+        "The hash function is encrypted with 3DES to send to the server: " +
+          getNoncePassword(pass.getHash())
+      );
+
+      socket.emit("register", {
+        username: name,
+        email: email,
+        password: noncePass,
+      });
+      // Lưu thông tin người dùng vào localStorage
+      var userData = {
+        username: name,
+        email: email,
+        password: noncePass
+        // Các thông tin khác của người dùng nếu cần
+      };
+      localStorage.me = JSON.stringify(userData);
+    }
+  });
+
+  $("#loginButton").on("click", () => {
+    console.log("login button clicked");
+    // Xác thực dữ liệu
+    var check = true;
+    for (var i = 0; i < loginInputs.length; i++) {
+      if (validate(loginInputs[i]) == false) {
+        showValidate(loginInputs[i]);
         check = false;
       }
     }
 
     if (check) {
       // Nếu dữ liệu đăng nhập hợp lệ thì:
-      var name = $.trim($("#yourName").val());
-      var email = $("#yourEmail").val();
-      var pass = $("#yourPass").val();
+      var email = $("#loginEmail").val();
+      var pass = $("#loginPass").val();
 
-      localStorage.hashedPass = pass.getHash(); // lưu trữ mật khẩu đc hashing
+      localStorage.hashedPass = pass.getHash(); // lưu trữ mật khẩu đc băm
       var noncePass = getNoncePassword(localStorage.hashedPass);
 
+      console.log("Login user email: " + email);
+      console.log("Login user password: " + pass);
+      console.log("Hash the password using SHA-512: " + pass.getHash());
+      console.log(
+        "The hash function is encrypted with 3DES to send to the server: " +
+          getNoncePassword(pass.getHash())
+      );
+
       socket.emit("login", {
-        username: name,
         email: email,
         password: noncePass,
       });
@@ -568,6 +673,16 @@ function getNoncePassword(pass) {
     });
   });
 
+  $(".validate-register .input100").each(function () {
+    $(this).focus(function () {
+      hideValidate(this);
+    });
+  });
+  $(".validate-login .input100").each(function () {
+    $(this).focus(function () {
+      hideValidate(this);
+    });
+  });
   function validate(input) {
     if ($(input).attr("type") == "email" || $(input).attr("name") == "email") {
       if (
@@ -598,27 +713,19 @@ function getNoncePassword(pass) {
 
     $(thisAlert).removeClass("alert-validate");
   }
-  $("#registerButton").click(function () {
-    $("#registerForm").css("display", "none");
-    $("#loginForm").css("display", "block");
+
+  // Toggle between register and login forms
+  $("#registerLink").on("click", (e) => {
+    e.preventDefault();
+    $("#loginForm").hide();
+    $("#registerForm").show();
   });
 
-  // Lắng nghe sự kiện click trên thẻ "Login"
-  $("#loginLink").click(function () {
-    $("#registerForm").css("display", "none");
-    $("#loginForm").css("display", "block");
+  $("#loginLink").on("click", (e) => {
+    e.preventDefault();
+    $("#registerForm").hide();
+    $("#loginForm").show();
   });
 
-  // Lắng nghe sự kiện click trên thẻ "Register"
-  $("#registerLink").click(function () {
-    $("#loginForm").css("display", "none");
-    $("#registerForm").css("display", "block");
-  });
-
-  // Sự kiện click cho nút "Register"
-  $("#registerButton").click(function () {
-    var username = $("#yourUsername").val();
-    $("#yourName").val(username);
-  });
 })(jQuery);
 
