@@ -146,16 +146,15 @@ async function updateUserInDatabase(user) {
 // Hàm để xử lý đăng ký người dùng
 async function handleRegister(socket, data) {
   try {
-    console.log("handleRegister called");
-    console.log("Socket ID:", socket.id);
-    console.log("Data received:", data);
+
     // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
     var userHashedPass = crypto.TripleDES.decrypt(
       data.password,
       socket.id
     ).toString(crypto.enc.Utf8);
 
-    console.log("Server password received (Register): " + data.password);
+    console.log("Register");
+    console.log("Server password received: " + data.password);
     console.log("Decrypt password using 3 DES: " + userHashedPass);
 
     // Lấy thông tin người dùng từ cơ sở dữ liệu
@@ -165,7 +164,6 @@ async function handleRegister(socket, data) {
       // người dùng tồn tại
       socket.emit("registerExits", "User already exists!"); // Xử lý trường hợp người dùng đã tồn tại
     } else {
-      console.log(Date.now());
       // Người dùng chưa tồn tại, tiến hành đăng ký
       var newUser = {
         id: data.email.hashCode(), // Mã hóa email để làm id
@@ -203,7 +201,8 @@ async function handleLogin(socket, data) {
       socket.id
     ).toString(crypto.enc.Utf8);
     // Lấy thông tin người dùng từ cơ sở dữ liệu
-    console.log("Server password received (login): " + data.password);
+    console.log("Login");
+    console.log("Server password received: " + data.password);
     console.log("Decrypt password using 3 DES: " + userHashedPass);
     var user = await GetUserFromDatabase(data.email);
     if (user) {
