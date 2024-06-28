@@ -1,10 +1,10 @@
 var e = {};
 module.exports = e;
 
-e.clients = {}; // thuộc tính: id, giá trị: { socketid, id, username, email, pubKey, password, avatar, status }
+e.clients = {};
 e.messageTypes = ["ack", "request", "message", "symmetricKey"];
-e.messages = {}; // thuộc tính: channelName, giá trị: { from, to, date, type }
-e.channels = {}; // thuộc tính: channelName, giá trị: { name, p2p, adminUserId, users[] }
+e.messages = {};
+e.channels = {};
 
 // tạo GUID dài 16 ký tự
 e.generateGuid = function () {

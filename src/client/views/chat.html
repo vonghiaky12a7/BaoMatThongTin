@@ -1,29 +1,23 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Secure Chat</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <link rel="icon" href="../img/favicon.ico" />
-  <!--===============================================================================================-->
-  <!-- meyer-reset CSS -->
   <link rel="stylesheet" type="text/css" href="css/reset.min.css" />
-  <!-- font-awesome CSS -->
   <link rel="stylesheet" type="text/css" href="css/font-awesome.min.css" />
-  <!-- Login form CSS -->
   <link rel="stylesheet" type="text/css" href="css/login.css" />
-  <!-- Core CSS -->
   <link rel="stylesheet" type="text/css" href="css/stylesheet.css" />
-  <!--===============================================================================================-->
 </head>
 
 <body>
-  <!-- Section -->
   <div class="limiter">
     <div class="container-login100">
       <div class="wrap-login100">
-        <!-- Register Section -->
+
         <div id="registerForm" class="login100-form validate-form">
           <span class="login100-form-logo">
             <img id="yourAvatar" src="../img/unnamed.png" alt="avatar" />
@@ -31,17 +25,22 @@
 
           <span class="register100-form-title">Register</span>
 
+
+          <div class="wrap-input100 validate-register" data-validate="Enter username">
+            <input id="registerName" class="input100" type="text" name="username" placeholder="Username" />
+
           <div class="wrap-input100 validate-input" data-validate="Enter username">
             <input id="yourName" class="input100" type="text" name="username" placeholder="Username" />
+
             <span class="focus-input100"></span>
           </div>
 
-          <div class="wrap-input100 validate-input" data-validate="Enter email">
+          <div class="wrap-input100 validate-register" data-validate="Enter email">
             <input id="registerEmail" class="input100" type="email" name="email" placeholder="Email" />
             <span class="focus-input100"></span>
           </div>
 
-          <div class="wrap-input100 validate-input" data-validate="Enter password">
+          <div class="wrap-input100 validate-register" data-validate="Enter password">
             <input id="registerPass" class="input100" type="password" name="pass" placeholder="Password" />
             <span class="focus-input100"></span>
           </div>
@@ -50,25 +49,28 @@
             <button id="registerButton" class="login100-form-btn">Register</button>
           </div>
         </div>
-        <!-- Register Section -->
-        <!--login form-->
         <div id="loginForm" class="login100-form validate-form" style="display: none">
           <span class="login100-form-logo">
             <img id="yourAvatar" src="img/unnamed.png" />
           </span>
 
           <span class="login100-form-title">Login</span>
+
+          <div class="wrap-input100" data-validate="Enter email">
+            <input id="loginEmail" class="input100" type="email" name="email" placeholder="Email" />
+
           <div class="wrap-input100 validate-input" data-validate="Enter username" hidden>
             <input id="yourUsername" class="input100" type="text" name="username" placeholder="Username">
             <span class="focus-input100"></span>
           </div>
           <div class="wrap-input100 validate-input" data-validate="Enter email">
             <input id="yourEmail" class="input100" type="email" name="email" placeholder="Email" />
+
             <span class="focus-input100"></span>
           </div>
 
-          <div class="wrap-input100 validate-input" data-validate="Enter password">
-            <input id="yourPass" class="input100" type="password" name="pass" placeholder="Password" />
+          <div class="wrap-input100 validate-login" data-validate="Enter password">
+            <input id="loginPass" class="input100" type="password" name="pass" placeholder="Password" />
             <span class="focus-input100"></span>
           </div>
           <a href="#" id="registerLink" class="login-link">Register</a>
@@ -76,13 +78,10 @@
             <button id="loginButton" class="login100-form-btn">Login</button>
           </div>
         </div>
-        <!--login end-->
       </div>
     </div>
   </div>
-  <!-- Section -->
 
-  <!-- Chat Section -->
   <div id="frame" style="display: none">
     <div id="sidepanel">
       <div id="profile">
@@ -131,7 +130,7 @@
       <div class="message-input">
         <div class="wrap">
           <input type="text" placeholder="Write your message..." />
-          <i class="fa fa-paperclip attachment" aria-hidden="true" onclick="document.getElementById('fileInput').click()"></i>
+          <i class="fa fa-paperclip attachment" aria-hidden="true"></i>
           <button class="submit">
             <i class="fa fa-paper-plane" aria-hidden="true"></i>
           </button>
@@ -139,22 +138,15 @@
       </div>
     </div>
   </div>
-  <!-- .Chat Section -->
 
-  <!--===============================================================================================-->
-  <!-- jQuery Js -->
+
   <script type="text/javascript" src="js/jquery-3.3.1.min.js"></script>
-  <!-- Socket.io Js -->
   <script type="text/javascript" src="js/socket.io.js"></script>
-  <!-- Crypto Js for AES and Hash -->
   <script type="text/javascript" src="js/crypto-js/crypto-js.js"></script>
-  <!-- JSEncrypt for RSA  -->
   <script type="text/javascript" src="js/jsencrypt.min.js"></script>
-  <!-- Client Cryptology Lib Js -->
   <script type="text/javascript" src="js/crypto.js"></script>
-  <!-- Client core Js -->
   <script type="text/javascript" src="js/client.js"></script>
-  <!--===============================================================================================-->
+
 </body>
 
 </html>
