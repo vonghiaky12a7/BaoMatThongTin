@@ -92,6 +92,53 @@ module.exports = function (app, io) {
   chat = io;
   io.on("connection", function (socket) {
     console.info(`socket: ${socket.id} connected`);
+async function addChannelUser(channelName, userId) {
+  try {
+    await client.query(`SELECT add_channel_user($1, $2)`, [
+      channelName,
+      userId,
+    ]);
+    console.log(`User ${userId} added to channel ${channelName}`);
+
+    // Lấy thông tin kênh từ manager
+    const channel = manager.channels[channelName];
+
+    // Cập nhật trường p2p nếu kênh không phải là p2p
+    if (!channel.p2p) {
+      channel.p2p = true;
+      // Cập nhật lại thông tin kênh trong cơ sở dữ liệu
+      await updateChannelP2P(channelName, true);
+      console.log(`Channel ${channelName} updated to p2p`);
+    }
+  } catch (error) {
+    console.error(
+      `Error adding user ${userId} to channel ${channelName}:`,
+      error
+    );
+  }
+}
+
+// cập nhật p2p cho channel = true
+async function updateChannelP2P(channelName, isP2P) {
+  try {
+    await client.query(`UPDATE public.channels SET p2p = $1 WHERE name = $2`, [
+      isP2P,
+      channelName,
+    ]);
+    console.log(`Channel ${channelName} updated to p2p: ${isP2P}`);
+  } catch (error) {
+    console.error(`Error updating channel ${channelName} to p2p:`, error);
+  }
+}
+
+// Hàm để xử lý đăng ký người dùng
+async function handleRegister(socket, data) {
+  try {
+    // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
+    var userHashedPass = crypto.TripleDES.decrypt(
+      data.password,
+      socket.id
+    ).toString(crypto.enc.Utf8);
 
     // Khi client phát ra 'login', lưu tên và avatar của họ, và thêm họ vào kênhl
     socket.on("login", async (data) => {
@@ -158,6 +205,27 @@ module.exports = function (app, io) {
   }); // connected user - phạm vi socket
 }; // module.export func
 
+
+function userRegister(user, socket) {
+  user.socketid = socket.id;
+  socket.user = user;
+  // console.log("socketttttttiddd register:  " + user.socketid);
+
+  socket.join(globalChannel); // Tham gia vào nhóm chung cho tất cả người dùng đã xác thực
+
+  // Thêm người dùng vào tất cả các kênh đã tham gia
+  var userChannels = manager.getUserChannels(user.id, true); // Lấy danh sách kênh p2p của người dùng
+  for (var channel in userChannels) {
+    socket.join(channel);
+  }
+  updateAllUsers(); // Cập nhật danh sách người dùng cho tất cả
+  defineSocketEvents(socket); // Định nghĩa các sự kiện socket
+
+  console.info(
+    `User <${user.username}> by socket <${user.socketid}> connected`
+  );
+} 
+
 function userSigned(user, socket) {
   // Đánh dấu người dùng là "online" và gán socket id cho người dùng
   user.status = "online";
@@ -207,7 +275,22 @@ function createChannel(name, user, p2p) {
     status: "online",
     users: [user.id],
   };
-  manager.channels[name] = channel;
+  manager.channels[name] = channel; // lưu trữ kênh trong manager
+
+  // Add the admin user to the channel in PostgreSQL
+  client
+    .query(
+      "INSERT INTO channels(name, p2p, adminUserId, status, users) VALUES($1, $2, $3, $4, $5) RETURNING id",
+      [name, p2p, user.id, "online", [user.id]]
+    )
+    .then((res) => {
+      const channelId = res.rows[0].id;
+      console.log(`Created channel ${channelId}: ${name}`);
+    })
+    .catch((err) => {
+      console.error("Error inserting channel:", err);
+    });
+
   chat.sockets.connected[user.socketid].join(name); // Thêm người dùng làm quản trị viên vào kênh
   return channel;
 }
@@ -293,6 +376,7 @@ function defineSocketEvents(socket) {
   // Xử lý khi có yêu cầu chấp nhận chat từ người dùng
   socket.on("accept", (data) => {
     // Tìm người dùng chấp nhận yêu cầu chat bằng socket id
+  socket.on("accept", async (data) => {
     var from = socket.user || manager.findUser(socket.id);
 
     // Tìm người dùng mục tiêu để chấp nhận chat bằng user id
@@ -310,6 +394,14 @@ function defineSocketEvents(socket) {
       // Thêm người dùng mới vào kênh này
       channel.users.push(to.id);
       chat.sockets.connected[to.socketid].join(channel.name); // Thêm người dùng mới vào kênh chat
+      if (!channel.users.includes(to.id)) {
+        channel.users.push(to.id);
+
+        // Cập nhật cơ sở dữ liệu với người dùng mới được thêm vào kênh
+        await addChannelUser(channel.name, to.id);
+      }
+
+      chat.sockets.connected[to.socketid].join(channel.name);
 
       // Gửi tin nhắn chấp nhận cho người dùng đã gửi yêu cầu chat
       socket.to(to.socketid).emit("accept", {
