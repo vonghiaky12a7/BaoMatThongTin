@@ -439,12 +439,16 @@ function newMessage() {
     avatar: getMe().avatar,
   });
 
+
   // Log tin nhắn đã mã hóa và các key vào console
   console.log("Chat Symmetric Key: " + chatSymmetricKey);
   console.log("Message: " + message);
   console.log("Encrypted message:", Encryptmsg);
   console.log("Private Key:", keys.privateKey);
   console.log("Public Key:", keys.publicKey);
+
+  // Log tin nhắn đã mã hóa vào console
+  console.log("Encrypted message:", msg);
 
   // Xóa nội dung trong ô nhập tin nhắn
   $(".message-input input").val(null);
@@ -694,6 +698,16 @@ function getNoncePassword(pass) {
     $(thisAlert).removeClass("alert-validate");
   }
 
+})(jQuery);
+
+$(document).ready(function () {
+  // Lắng nghe sự kiện click trên button "Register"
+  $("#registerButton").click(function () {
+    $("#registerForm").css("display", "none");
+    $("#loginForm").css("display", "block");
+  });
+
+
   // Toggle between register and login forms
   $("#registerLink").on("click", (e) => {
     e.preventDefault();
@@ -707,5 +721,14 @@ function getNoncePassword(pass) {
     $("#loginForm").show();
   });
 
+
 })(jQuery);
+
+=======
+  // Sự kiện click cho nút "Register"
+  $("#registerButton").click(function () {
+    var username = $("#yourName").val();
+    $("#yourUsername").val(username);
+  });
+});
 
