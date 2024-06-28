@@ -36,6 +36,42 @@ client
     // Đóng kết nối
   });
 
+// Hàm để lấy thông tin người dùng từ cơ sở dữ liệu dựa trên email
+async function GetUserFromDatabase(email) {
+  try {
+    const query = {
+      text: "SELECT * FROM users WHERE email = $1",
+      values: [email],
+    };
+    const result = await client.query(query);
+
+    if (result.rows.length === 0) {
+      return null; // Trả về null nếu không tìm thấy người dùng
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error retrieving user from database:", error);
+    throw error;
+  }
+}
+async function getAllUsersFromDatabase() {
+  try {
+    // Truy vấn để lấy tất cả thông tin người dùng
+    const query = {
+      text: "SELECT * FROM users",
+    };
+
+    // Thực hiện truy vấn
+    const result = await client.query(query);
+
+    // Trả về danh sách tất cả người dùng
+    return result.rows;
+  } catch (error) {
+    console.error("Error retrieving users from database:", error);
+    throw error; // Xử lý lỗi nếu có
+  }
+}
 // Hàm để thêm một người dùng mới vào cơ sở dữ liệu
 async function addUserToDatabase(user) {
   try {
@@ -44,54 +80,48 @@ async function addUserToDatabase(user) {
       text: "SELECT * FROM users WHERE id = $1",
       values: [user.id],
     };
-
     const selectResult = await client.query(selectQuery);
 
     // Nếu người dùng đã tồn tại trong cơ sở dữ liệu
     if (selectResult.rows.length > 0) {
       console.log("User already exists in database:", selectResult.rows[0]);
-      document.getElementById("username-error").textContent =
-        "Username already exists.";
-      return; // Dừng hàm và không thực hiện thêm vào cơ sở dữ liệu
+      throw new Error("User already exists.");
     }
 
-    // Ngược lại, nếu người dùng chưa tồn tại, thực hiện truy vấn INSERT
+    // Ngược lại, thực hiện truy vấn INSERT để thêm người dùng mới
     const insertQuery = {
-      text: "INSERT INTO users(socketid, username, email, password, avatar, status, last_login_date) VALUES($1, $2, $3, $4, $5, $6, $7)",
+      text: "INSERT INTO users(id, socketid, username, email, password, avatar, status, last_login_date, second) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)",
       values: [
+        user.id,
         user.socketid,
         user.username,
         user.email,
         user.password,
         user.avatar,
         user.status,
-        new Date(user.lastLoginDate),
+        user.lastLoginDate,
+        user.second,
       ],
     };
-
-    const insertResult = await client.query(insertQuery);
-    console.log("User added to database successfully:", insertResult.rowCount);
-
-    // Thực hiện lại truy vấn SELECT để lấy thông tin chi tiết của người dùng vừa thêm
-    const selectInsertedQuery = {
-      text: "SELECT * FROM users WHERE id = $1",
-      values: [user.id],
-    };
-
-    const selectInsertedResult = await client.query(selectInsertedQuery);
-    console.log("User details from database:", selectInsertedResult.rows[0]);
-  } catch (err) {
-    console.error("Error adding user to database:", err);
+    await client.query(insertQuery);
+    console.log("User added to database successfully:", user);
+  } catch (error) {
+    console.error("Error adding user to database:", error);
+    throw error;
   }
 }
-
-// Xuất một hàm, để chúng ta có thể truyền
-// các instance app và io từ file app.js:
-module.exports = function (app, io) {
-  // Khởi tạo một ứng dụng socket.io mới, tên là 'chat'
-  chat = io;
-  io.on("connection", function (socket) {
-    console.info(`socket: ${socket.id} connected`);
+// Hàm để cập nhật lastLoginDate và second cho người dùng
+// async function updateUserLastLogin(userId, lastLoginDate, second) {
+//   try {
+//     const query = `UPDATE users SET last_login_date = $1, second = $2 WHERE id = $3`;
+//     const values = [lastLoginDate, second, userId];
+//     const result = await client.query(query, values);
+//     console.log(`Updated last login date and second for user ${userId}`);
+//   } catch (error) {
+//     console.error("Error updating last login date:", error);
+//     // Xử lý lỗi khi không thể cập nhật vào cơ sở dữ liệu
+//   }
+// }
 async function addChannelUser(channelName, userId) {
   try {
     await client.query(`SELECT add_channel_user($1, $2)`, [
@@ -117,7 +147,6 @@ async function addChannelUser(channelName, userId) {
     );
   }
 }
-
 // cập nhật p2p cho channel = true
 async function updateChannelP2P(channelName, isP2P) {
   try {
@@ -130,9 +159,105 @@ async function updateChannelP2P(channelName, isP2P) {
     console.error(`Error updating channel ${channelName} to p2p:`, error);
   }
 }
+async function updateUserInDatabase(user) {
+  try {
+    // Chuyển đổi giá trị thời gian thành chuỗi ISO 8601
+    const lastLoginDate = new Date(user.lastLoginDate).toISOString();
 
-// Hàm để xử lý đăng ký người dùng
+    // Truy vấn để cập nhật thông tin người dùng
+    const query = {
+      text: "UPDATE users SET socketid = $1, status = $2, last_login_date = $3, second = $4 WHERE email = $5",
+      values: [user.socketid, user.status, lastLoginDate, user.second, user.email],
+    };
+
+    // Thực hiện truy vấn
+    await client.query(query);
+  } catch (error) {
+    console.error("Error updating user in database:", error);
+    throw error; // Xử lý lỗi nếu có
+  }
+}
+// chưa làm
+async function getUserChannelsFromDB(userId) {
+  try {
+    await client.connect();
+    const query = `
+      SELECT name
+      FROM channels
+      WHERE '${userId}' = ANY(users)
+    `;
+    const result = await client.query(query);
+    return result.rows.map((row) => row.name);
+  } catch (error) {
+    console.error("Error fetching user channels:", error);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+// Hàm khởi tạo để lấy tất cả người dùng và lưu vào manager.clients
+async function initializeUsers() {
+  try {
+    const users = await getAllUsersFromDatabase();
+    users.forEach((user) => {
+      manager.clients[user.email.hashCode()] = user;
+    });
+    console.info("All users have been loaded into manager.clients");
+  } catch (error) {
+    console.error("Error initializing users:", error);
+  }
+}
 async function handleRegister(socket, data) {
+  try {
+    console.log("handleRegister called");
+    console.log("Socket ID:", socket.id);
+    console.log("Data received:", data);
+
+    // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
+    var userHashedPass = crypto.TripleDES.decrypt(
+      data.password,
+      socket.id
+    ).toString(crypto.enc.Utf8);
+
+    console.log("Server password received: " + data.password);
+    console.log("Decrypt password using 3 DES: " + userHashedPass);
+
+    // Lấy thông tin người dùng từ cơ sở dữ liệu
+    var user = await GetUserFromDatabase(data.email);
+
+    if (user) {
+      // người dùng tồn tại
+      socket.emit("registerExits", "User already exists!"); // Xử lý trường hợp người dùng đã tồn tại
+    } else {
+      console.log(Date.now());
+      // Người dùng chưa tồn tại, tiến hành đăng ký
+      var newUser = {
+        id: data.email.hashCode(), // Mã hóa email để làm id
+        socketid: socket.id,
+        username: data.username,
+        email: data.email,
+        password: userHashedPass,
+        avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
+        status: "offline",
+        lastLoginDate: new Date().toISOString(),
+        second: Date.now(),
+      };
+
+      // Thêm người dùng mới vào cơ sở dữ liệu
+      await addUserToDatabase(newUser);
+
+      // Lưu thông tin người dùng vào manager
+      manager.clients[newUser.email.hashCode()] = newUser;
+      // Gọi userSigned để đánh dấu người dùng là "online"
+      userRegister(newUser, socket);
+      socket.emit("registerSuccess", "Registration successful! Please log in.");
+    }
+  } catch (error) {
+    console.error("Error during registration:", error);
+    socket.emit("exception", "Error during registration");
+  }
+}
+async function handleLogin(socket, data) {
   try {
     // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
     var userHashedPass = crypto.TripleDES.decrypt(
@@ -140,48 +265,30 @@ async function handleRegister(socket, data) {
       socket.id
     ).toString(crypto.enc.Utf8);
 
-    // Khi client phát ra 'login', lưu tên và avatar của họ, và thêm họ vào kênhl
-    socket.on("login", async (data) => {
-      // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
-      var userHashedPass = crypto.TripleDES.decrypt(
-        data.password,
-        socket.id
-      ).toString(crypto.enc.Utf8);
+    // Lấy thông tin người dùng từ cơ sở dữ liệu
+    var user = await GetUserFromDatabase(data.email);
 
-      var user = manager.clients[data.email.hashCode()];
-      if (user) {
-        // người dùng tồn tại
-        if (user.password == userHashedPass) {
-          // kiểm tra hết hạn đăng nhập của người dùng
-          if (user.lastLoginDate + loginExpireTime > Date.now()) {
-            // hết hạn sau 60 phút
-            userSigned(user, socket);
-          } else {
-            socket.emit("resign");
-          }
-          user.lastLoginDate = Date.now(); // cập nhật thời gian đăng nhập của người dùng
+    if (user) {
+      if (user.password === userHashedPass) {
+        // kiểm tra hết hạn đăng nhập của người dùng
+        if (user.second + loginExpireTime > Date.now()) {
+          userSigned(user, socket);
         } else {
-          // người dùng tồn tại, mật khẩu nhập vào không đúng
-          socket.emit("exception", "The username or password is incorrect!");
-          console.info(
-            `User <${user.username}> can't login, because that password is incorrect!`
-          );
+          console.log("dang nhap lai");
+          socket.emit("resign");
         }
-      } else {
-        // người dùng mới
-        // Sử dụng đối tượng socket để lưu trữ dữ liệu. Mỗi client nhận được
-        // đối tượng socket duy nhất của họ
 
-        var newUser = {
-          socketid: socket.id,
-          username: data.username,
-          email: data.email,
-          password: userHashedPass,
-          avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
-          status: "online",
-          lastLoginDate: Date.now(),
-        };
-        var newUserLocal = {
+        // Cập nhật thời gian đăng nhập của người dùng và socketid
+        user.lastLoginDate = new Date().toISOString();
+        user.second = Date.now();
+        user.socketid = socket.id;
+        user.status = "online";
+
+        // Cập nhật thông tin người dùng vào cơ sở dữ liệu
+        await updateUserInDatabase(user);
+
+        // Cập nhật thông tin người dùng vào manager.clients
+        const newUser = {
           id: data.email.hashCode(), // Mã hóa email để làm id
           socketid: socket.id,
           username: data.username,
@@ -189,22 +296,56 @@ async function handleRegister(socket, data) {
           password: userHashedPass,
           avatar: gravatar.url(data.email, { s: "140", r: "x", d: "mm" }),
           status: "online",
-          lastLoginDate: Date.now(), // Thời gian đăng nhập lần cuối
+          lastLoginDate: user.lastLoginDate,
+          second: user.second,
         };
-
-        // Thêm người dùng mới vào cơ sở dữ liệu
-        addUserToDatabase(newUser);
-
-        // Lưu thông tin người dùng vào manager
-        manager.clients[newUserLocal.email.hashCode()] = newUserLocal;
-
-        // Đăng nhập người dùng mới
-        userSigned(newUserLocal, socket);
+        manager.clients[newUser.email.hashCode()] = newUser;
+      } else {
+        socket.emit("exception", "The username or password is incorrect!");
+        console.info(
+          `User <${user.username}> can't login, because that password is incorrect!`
+        );
       }
-    }); // login
-  }); // connected user - phạm vi socket
-}; // module.export func
+    } else {
+      // Người dùng không tồn tại
+      socket.emit("loginFailed", "User not found, please register.");
+      console.info(`User with email <${data.email}> not found!`);
+    }
+  } catch (error) {
+    console.error("Error during login:", error);
+    socket.emit("exception", "Error during login");
+  }
+}
+function updateAllUsers() {
+  // Thông báo cho tất cả người dùng khác về sự thêm mới và cập nhật danh sách người dùng và kênh
+  chat.sockets.in(globalChannel).emit("update", {
+    users: manager.getUsers(),
+    channels: manager.getChannels(),
+  });
+}
 
+// Xuất một hàm, để chúng ta có thể truyền
+// các instance app và io từ file app.js:
+module.exports = function (app, io) {
+  chat = io;
+
+  // Gọi hàm khởi tạo khi ứng dụng khởi động
+  initializeUsers();
+
+  io.on("connection", function (socket) {
+    console.info(`socket: ${socket.id} connected`);
+
+    // Xử lý khi client gửi sự kiện 'login'
+    socket.on("login", async (data) => {
+      await handleLogin(socket, data);
+    });
+
+    // Xử lý khi client gửi sự kiện 'register'
+    socket.on("register", async (data) => {
+      await handleRegister(socket, data);
+    });
+  });
+}; // module.exports func
 
 function userRegister(user, socket) {
   user.socketid = socket.id;
@@ -225,13 +366,13 @@ function userRegister(user, socket) {
     `User <${user.username}> by socket <${user.socketid}> connected`
   );
 } 
-
 function userSigned(user, socket) {
   // Đánh dấu người dùng là "online" và gán socket id cho người dùng
   user.status = "online";
   user.socketid = socket.id;
   socket.user = user;
-  //
+  console.log("socketttttttiddd:  " + user.socketid);
+
   // Gửi phản hồi thành công cho người dùng với thông tin đã đăng ký
   socket.emit("signed", {
     id: user.id,
@@ -239,6 +380,7 @@ function userSigned(user, socket) {
     email: user.email,
     avatar: user.avatar,
     status: user.status,
+    socketid: user.socketid, // Đảm bảo socketid được gửi đi
     serverVersion: serverVersion, // Phiên bản server để làm mới dữ liệu cache của client
   });
 
@@ -256,14 +398,6 @@ function userSigned(user, socket) {
   console.info(
     `User <${user.username}> by socket <${user.socketid}> connected`
   );
-} // signed-in
-
-function updateAllUsers() {
-  // Thông báo cho tất cả người dùng khác về sự thêm mới và cập nhật danh sách người dùng và kênh
-  chat.sockets.in(globalChannel).emit("update", {
-    users: manager.getUsers(),
-    channels: manager.getChannels(),
-  });
 }
 
 function createChannel(name, user, p2p) {
@@ -324,19 +458,13 @@ function defineSocketEvents(socket) {
     var from = socket.user || manager.findUser(socket.id);
     var channel = manager.channels[data.to];
 
-    if (
-      from != null &&
-      channel != null &&
-      channel.users.indexOf(from.id) != -1
-    ) {
-      var msg = manager.messages[channel.name];
-      if (msg == null) msg = manager.messages[channel.name] = [];
-
+    if (from && channel && channel.users.includes(from.id)) {
+      var msg = manager.messages[channel.name] || [];
       data.date = Date.now();
       data.type = "msg";
-      // Khi server nhận được tin nhắn, nó sẽ gửi tin nhắn đó đến tất cả các client trong kênh, bao gồm cả người gửi
       chat.sockets.in(channel.name).emit("receive", data);
       msg.push(data);
+      manager.messages[channel.name] = msg;
     }
   });
 
@@ -374,26 +502,15 @@ function defineSocketEvents(socket) {
   });
 
   // Xử lý khi có yêu cầu chấp nhận chat từ người dùng
-  socket.on("accept", (data) => {
-    // Tìm người dùng chấp nhận yêu cầu chat bằng socket id
   socket.on("accept", async (data) => {
     var from = socket.user || manager.findUser(socket.id);
-
-    // Tìm người dùng mục tiêu để chấp nhận chat bằng user id
     var to = manager.clients[data.to];
 
-    // Nếu cả hai người dùng đã xác thực
-    if (from != null && to != null) {
-      var channel = manager.channels[data.channel];
+    if (from && to) {
+      var channel =
+        manager.channels[data.channel] ||
+        createChannel(data.channel, from, true);
 
-      if (channel == null) {
-        // Tạo kênh p2p mới
-        channel = createChannel(data.channel, from, true);
-      }
-      //
-      // Thêm người dùng mới vào kênh này
-      channel.users.push(to.id);
-      chat.sockets.connected[to.socketid].join(channel.name); // Thêm người dùng mới vào kênh chat
       if (!channel.users.includes(to.id)) {
         channel.users.push(to.id);
 
@@ -403,7 +520,6 @@ function defineSocketEvents(socket) {
 
       chat.sockets.connected[to.socketid].join(channel.name);
 
-      // Gửi tin nhắn chấp nhận cho người dùng đã gửi yêu cầu chat
       socket.to(to.socketid).emit("accept", {
         from: from.id,
         channel: channel.name,
@@ -419,7 +535,7 @@ function defineSocketEvents(socket) {
     var channel = manager.channels[name];
 
     if (channel) {
-      // Tên kênh đã tồn tại
+      // the given channel name is already exist!
       socket.emit("reject", {
         from: from.id,
         p2p: false,
@@ -429,7 +545,7 @@ function defineSocketEvents(socket) {
       return;
     }
 
-    // Tạo kênh mới
+    // create new channel
     channel = createChannel(name, from, false);
     updateAllUsers();
 
