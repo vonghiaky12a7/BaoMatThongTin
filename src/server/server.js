@@ -55,6 +55,7 @@ async function GetUserFromDatabase(email) {
     throw error;
   }
 }
+// Hàm lấy tất cả người dùng từ cơ sở dữ liệu, trừ người dùng hiện tại
 async function getAllUsersFromDatabase() {
   try {
     // Truy vấn để lấy tất cả thông tin người dùng
@@ -72,6 +73,7 @@ async function getAllUsersFromDatabase() {
     throw error; // Xử lý lỗi nếu có
   }
 }
+
 // Hàm để thêm một người dùng mới vào cơ sở dữ liệu
 async function addUserToDatabase(user) {
   try {
@@ -110,18 +112,7 @@ async function addUserToDatabase(user) {
     throw error;
   }
 }
-// Hàm để cập nhật lastLoginDate và second cho người dùng
-// async function updateUserLastLogin(userId, lastLoginDate, second) {
-//   try {
-//     const query = `UPDATE users SET last_login_date = $1, second = $2 WHERE id = $3`;
-//     const values = [lastLoginDate, second, userId];
-//     const result = await client.query(query, values);
-//     console.log(`Updated last login date and second for user ${userId}`);
-//   } catch (error) {
-//     console.error("Error updating last login date:", error);
-//     // Xử lý lỗi khi không thể cập nhật vào cơ sở dữ liệu
-//   }
-// }
+
 async function addChannelUser(channelName, userId) {
   try {
     await client.query(`SELECT add_channel_user($1, $2)`, [
@@ -178,23 +169,7 @@ async function updateUserInDatabase(user) {
   }
 }
 // chưa làm
-async function getUserChannelsFromDB(userId) {
-  try {
-    await client.connect();
-    const query = `
-      SELECT name
-      FROM channels
-      WHERE '${userId}' = ANY(users)
-    `;
-    const result = await client.query(query);
-    return result.rows.map((row) => row.name);
-  } catch (error) {
-    console.error("Error fetching user channels:", error);
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
+
 // Hàm khởi tạo để lấy tất cả người dùng và lưu vào manager.clients
 async function initializeUsers() {
   try {
@@ -274,7 +249,6 @@ async function handleLogin(socket, data) {
         if (user.second + loginExpireTime > Date.now()) {
           userSigned(user, socket);
         } else {
-          console.log("dang nhap lai");
           socket.emit("resign");
         }
 
@@ -350,7 +324,6 @@ module.exports = function (app, io) {
 function userRegister(user, socket) {
   user.socketid = socket.id;
   socket.user = user;
-  // console.log("socketttttttiddd register:  " + user.socketid);
 
   socket.join(globalChannel); // Tham gia vào nhóm chung cho tất cả người dùng đã xác thực
 
@@ -371,7 +344,6 @@ function userSigned(user, socket) {
   user.status = "online";
   user.socketid = socket.id;
   socket.user = user;
-  console.log("socketttttttiddd:  " + user.socketid);
 
   // Gửi phản hồi thành công cho người dùng với thông tin đã đăng ký
   socket.emit("signed", {
@@ -429,6 +401,21 @@ function createChannel(name, user, p2p) {
   return channel;
 }
 
+// lưu tin nhắn vào csdl
+async function saveMessageToDatabase(data) {
+  try {
+    const query = `
+      INSERT INTO public.message (msg, "from", "to", date)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id
+    `;
+    const values = [data.msg, data.from, data.to, new Date(data.date)];
+    const res = await client.query(query, values);
+    console.log("Message inserted with ID:", res.rows[0].id);
+  } catch (error) {
+    console.error("Error inserting message into database:", error);
+  }
+}
 function defineSocketEvents(socket) {
   // Xử lý khi có người dùng ngắt kết nối
   socket.on("disconnect", () => {
@@ -454,9 +441,13 @@ function defineSocketEvents(socket) {
   });
 
   // Xử lý khi có tin nhắn được gửi đi
-  socket.on("msg", (data) => {
+  socket.on("msg", async (data) => {
     var from = socket.user || manager.findUser(socket.id);
     var channel = manager.channels[data.to];
+    if (from != null && channel != null && channel.users.indexOf(from.id) != -1) {
+      var msg = manager.messages[channel.name];
+      if (msg == null) msg = manager.messages[channel.name] = [];
+    }
 
     if (from && channel && channel.users.includes(from.id)) {
       var msg = manager.messages[channel.name] || [];
@@ -465,6 +456,9 @@ function defineSocketEvents(socket) {
       chat.sockets.in(channel.name).emit("receive", data);
       msg.push(data);
       manager.messages[channel.name] = msg;
+
+      // Save message to database
+      await saveMessageToDatabase(data);
     }
   });
 
@@ -506,10 +500,21 @@ function defineSocketEvents(socket) {
     var from = socket.user || manager.findUser(socket.id);
     var to = manager.clients[data.to];
 
+    // Nếu cả hai người dùng đã xác thực
+    if (from != null && to != null) {
+      var channel = manager.channels[data.channel];
+    }
+      
     if (from && to) {
-      var channel =
-        manager.channels[data.channel] ||
-        createChannel(data.channel, from, true);
+      var channel = manager.channels[data.channel] || createChannel(data.channel, from, true);
+      if (channel == null) {
+        // Tạo kênh p2p mới
+        channel = createChannel(data.channel, from, true);
+      }
+      //
+      // Thêm người dùng mới vào kênh này
+      channel.users.push(to.id);
+      chat.sockets.connected[to.socketid].join(channel.name); // Thêm người dùng mới vào kênh chat
 
       if (!channel.users.includes(to.id)) {
         channel.users.push(to.id);
@@ -533,17 +538,6 @@ function defineSocketEvents(socket) {
   socket.on("createChannel", (name) => {
     var from = socket.user;
     var channel = manager.channels[name];
-
-    if (channel) {
-      // the given channel name is already exist!
-      socket.emit("reject", {
-        from: from.id,
-        p2p: false,
-        channel: channel,
-        msg: "The given channel name is already exist",
-      });
-      return;
-    }
 
     // create new channel
     channel = createChannel(name, from, false);

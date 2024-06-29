@@ -65,7 +65,7 @@ e.getChannels = function () {
   for (prop in e.channels) {
     var r = e.channels[prop];
     if (r.p2p === false) {
-      lstChannels[prop] = r;
+      lstChannels[prop] = r;  
     }
   }
   return lstChannels;

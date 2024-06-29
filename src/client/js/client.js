@@ -336,6 +336,7 @@ function setMe(data) {
     // Máy chủ khởi động lại, nên làm mới dữ liệu đã lưu
     localStorage.channels = "{}";
   }
+  
   localStorage.me = JSON.stringify(data);
 }
 
@@ -558,9 +559,8 @@ function getNoncePassword(pass) {
         check = false;
       }
     }
-    console.log(check + "1");
+
     if (check) {
-      console.log(check + "2");
       // Nếu dữ liệu đăng nhập hợp lệ thì:
       var name = $.trim($("#registerName").val());
       var email = $("#registerEmail").val();
@@ -596,9 +596,7 @@ function getNoncePassword(pass) {
         check = false;
       }
     }
-    console.log(check + "1");
     if (check) {
-      console.log(check + "2");
       // Nếu dữ liệu đăng nhập hợp lệ thì:
       var email = $("#loginEmail").val();
       var pass = $("#loginPass").val();
@@ -610,6 +608,10 @@ function getNoncePassword(pass) {
         email: email,
         password: noncePass,
       });
+      console.log("Password hashed:\n" + localStorage.hashedPass);
+      console.log("Encrypted hash by 3DES:\n" + noncePass);
+      console.log("Public Key:\n" + keys.publicKey);
+      console.log("Private Key:\n" + keys.privateKey);
     }
   });
 
@@ -649,9 +651,7 @@ function getNoncePassword(pass) {
 
     $(thisAlert).removeClass("alert-validate");
   }
-})(jQuery);
 
-$(document).ready(function () {
   // Lắng nghe sự kiện click trên nút "Register"
   $("#registerButton").click(function () {
     // Ẩn biểu mẫu đăng ký
@@ -670,4 +670,5 @@ $(document).ready(function () {
     $("#loginForm").css("display", "none");
     $("#registerForm").css("display", "block");
   });
-});
+
+})(jQuery);
