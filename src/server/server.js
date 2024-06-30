@@ -158,7 +158,13 @@ async function updateUserInDatabase(user) {
     // Truy vấn để cập nhật thông tin người dùng
     const query = {
       text: "UPDATE users SET socketid = $1, status = $2, last_login_date = $3, second = $4 WHERE email = $5",
-      values: [user.socketid, user.status, lastLoginDate, user.second, user.email],
+      values: [
+        user.socketid,
+        user.status,
+        lastLoginDate,
+        user.second,
+        user.email,
+      ],
     };
 
     // Thực hiện truy vấn
@@ -168,7 +174,20 @@ async function updateUserInDatabase(user) {
     throw error; // Xử lý lỗi nếu có
   }
 }
-// chưa làm
+// lưu khóa
+async function storeUserKeys(userId, publicKey, privateKey) {
+  const query = {
+    text: "INSERT INTO user_keys (user_id, public_key, private_key) VALUES ($1, $2, $3) RETURNING id",
+    values: [userId, publicKey, privateKey],
+  };
+
+  try {
+    const res = await client.query(query);
+    console.log("Key stored with ID:", res.rows[0].id);
+  } catch (err) {
+    console.error("Error storing keys:", err);
+  }
+}
 
 // Hàm khởi tạo để lấy tất cả người dùng và lưu vào manager.clients
 async function initializeUsers() {
@@ -187,15 +206,11 @@ async function handleRegister(socket, data) {
     console.log("handleRegister called");
     console.log("Socket ID:", socket.id);
     console.log("Data received:", data);
-
     // kiểm tra mật khẩu đăng nhập từ decrypt cipher bằng mật khẩu nonce (socket.id)
     var userHashedPass = crypto.TripleDES.decrypt(
       data.password,
       socket.id
     ).toString(crypto.enc.Utf8);
-
-    console.log("Server password received: " + data.password);
-    console.log("Decrypt password using 3 DES: " + userHashedPass);
 
     // Lấy thông tin người dùng từ cơ sở dữ liệu
     var user = await GetUserFromDatabase(data.email);
@@ -204,7 +219,6 @@ async function handleRegister(socket, data) {
       // người dùng tồn tại
       socket.emit("registerExits", "User already exists!"); // Xử lý trường hợp người dùng đã tồn tại
     } else {
-      console.log(Date.now());
       // Người dùng chưa tồn tại, tiến hành đăng ký
       var newUser = {
         id: data.email.hashCode(), // Mã hóa email để làm id
@@ -217,9 +231,14 @@ async function handleRegister(socket, data) {
         lastLoginDate: new Date().toISOString(),
         second: Date.now(),
       };
-
       // Thêm người dùng mới vào cơ sở dữ liệu
       await addUserToDatabase(newUser);
+      // lưu khóa
+      await storeUserKeys(
+        data.email.hashCode(),
+        data.publickey,
+        data.privatekey
+      );
 
       // Lưu thông tin người dùng vào manager
       manager.clients[newUser.email.hashCode()] = newUser;
@@ -338,7 +357,7 @@ function userRegister(user, socket) {
   console.info(
     `User <${user.username}> by socket <${user.socketid}> connected`
   );
-} 
+}
 function userSigned(user, socket) {
   // Đánh dấu người dùng là "online" và gán socket id cho người dùng
   user.status = "online";
@@ -444,7 +463,11 @@ function defineSocketEvents(socket) {
   socket.on("msg", async (data) => {
     var from = socket.user || manager.findUser(socket.id);
     var channel = manager.channels[data.to];
-    if (from != null && channel != null && channel.users.indexOf(from.id) != -1) {
+    if (
+      from != null &&
+      channel != null &&
+      channel.users.indexOf(from.id) != -1
+    ) {
       var msg = manager.messages[channel.name];
       if (msg == null) msg = manager.messages[channel.name] = [];
     }
@@ -504,9 +527,11 @@ function defineSocketEvents(socket) {
     if (from != null && to != null) {
       var channel = manager.channels[data.channel];
     }
-      
+
     if (from && to) {
-      var channel = manager.channels[data.channel] || createChannel(data.channel, from, true);
+      var channel =
+        manager.channels[data.channel] ||
+        createChannel(data.channel, from, true);
       if (channel == null) {
         // Tạo kênh p2p mới
         channel = createChannel(data.channel, from, true);

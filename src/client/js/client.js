@@ -568,11 +568,14 @@ function getNoncePassword(pass) {
 
       localStorage.hashedPass = pass.getHash(); // lưu trữ mật khẩu đc băm
       var noncePass = getNoncePassword(localStorage.hashedPass);
-
+      console.log("Public Key:\n" + keys.publicKey);
+      console.log("Private Key:\n" + keys.privateKey);
       socket.emit("register", {
         username: name,
         email: email,
         password: noncePass,
+        publickey: keys.publicKey,
+        privatekey: keys.privateKey,
       });
       // Lưu thông tin người dùng vào localStorage
       var userData = {
@@ -585,9 +588,11 @@ function getNoncePassword(pass) {
     }
   });
 
+  
   // Submit login div
   $("#loginButton").on("click", () => {
     console.log("login button clicked");
+    
     // Xác thực dữ liệu
     var check = true;
     for (var i = 0; i < loginInputs.length; i++) {
